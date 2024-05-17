@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css'; // Import Bootstrap CSS
 import Notification from '../notifications/Notifications';
-
+import { useNavigate } from "react-router-dom";
 
 const Appointments = () => {
   // State variables
@@ -16,6 +16,9 @@ const Appointments = () => {
   const [patientEmail, setPatientEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true); // State for loading indicator
   const [doctorName, setDoctorName] = useState('');
+  const [doctorfee, setDoctorFee] = useState('');
+
+  const navigate = useNavigate();
 
   // Fetch doctors list when the component mounts
   useEffect(() => {
@@ -26,6 +29,12 @@ const Appointments = () => {
         console.log(data);
         setDoctors(data); // Update state with fetched doctors list
         setDoctorName(data[0].name)
+
+        data.forEach(doctor => {
+          setDoctorFee(doctor.doctorfee);
+        });
+
+
         setIsLoading(false); // Update loading state
       } catch (error) {
         console.error('Error fetching doctors:', error);
@@ -40,64 +49,66 @@ const Appointments = () => {
     e.preventDefault();
 
 
+
+    // Find the selected doctor object from the doctors array
+    const selectedDoctorObject = doctors.find(doctor => doctor.doctorId === selectedDoctor);
+    const appointmentData = {
+      appointmentId: appointmentId,
+      doctorId: selectedDoctor,
+      doctorName: selectedDoctorObject.name,
+      patientId: patientId,
+      date: selectedDate,
+      slot: selectedSlot,
+      patientEmail: patientEmail
+
+    };
+
+    const response = await fetch('http://localhost:9002/ibm-appointment/appointments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(appointmentData), // Convert data to JSON
+    });
+
+    const data = await response.json();
+
+
+    setMessage('sucessfully booked!');
+    setAppointmentId(data.appointmentId);
+    setDoctorName(selectedDoctorObject.name);
+    setSelectedDoctor('');
+    setSelectedDate('');
+    setSelectedSlot('');
+    setPatientId('');
+    setPatientEmail('');
+    // Clear form fields after successful submission
+    setAppointmentId('');
+    setPatientId('');
+    setPatientEmail('');
     try {
-      // Find the selected doctor object from the doctors array
-      const selectedDoctorObject = doctors.find(doctor => doctor.doctorId === selectedDoctor);
-      const appointmentData = {
-        appointmentId: appointmentId,
-        doctorId: selectedDoctor,
-        doctorName: selectedDoctorObject.name,
-        patientId: patientId,
-        date: selectedDate,
-        slot: selectedSlot,
-        patientEmail: patientEmail
-
-      };
-
-      const response = await fetch('http://localhost:9002/ibm-appointment/appointments', {
+      const response = await fetch('http://localhost:9002/ibm-appointment/email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(appointmentData), // Convert data to JSON
+        body: JSON.stringify(), // Send patient email for notification
       });
 
-      const data = await response.json();
-
-
-      setMessage(data.message);
-      setAppointmentId(data.appointmentId);
-      setDoctorName(selectedDoctorObject.name);
-      setSelectedDoctor('');
-      setSelectedDate('');
-      setSelectedSlot('');
-      setPatientId('');
-      setPatientEmail('');
-      // Clear form fields after successful submission
-      setAppointmentId('');
-      setPatientId('');
-      setPatientEmail('');
-      try {
-        const response = await fetch('http://localhost:9002/ibm-appointment/email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(), // Send patient email for notification
-        });
-
-        if (!response.ok) {
-          console.error('Failed to send email notification.');
-        }
-      } catch (error) {
-        console.error('Error sending email notification:', error);
+      if (!response.ok) {
+        console.error('Failed to send email notification.');
       }
     } catch (error) {
-      // console.error('Error booking appointment:', error);
-      // setMessage('Error booking appointment. Please try again later.');
+      console.error('Error sending email notification:', error);
     }
+
   };
 
+
+  // Function to handle navigation to payment page
+  const handlePaymentClick = () => {
+    navigate('/payment'); // Navigate to the payment page
+  };
 
 
   return (
@@ -114,6 +125,7 @@ const Appointments = () => {
           />
         </div>
         <div className="form-group">
+
           <select
             className="form-control"
             value={selectedDoctor}
@@ -124,10 +136,13 @@ const Appointments = () => {
               <option disabled>Loading...</option>
             ) : (
               doctors.map(doctor => (
-                <option key={doctor.doctorId} value={doctor.doctorId}>{doctor.name}</option>
+                <option key={doctor.doctorId} value={doctor.doctorId}>
+                  {doctor.name} - Appointment fee: {doctor.doctorfee}
+                </option>
               ))
             )}
           </select>
+
         </div>
         <div className="form-group">
           <input className="form-control" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} placeholder="Date" />
@@ -136,15 +151,18 @@ const Appointments = () => {
           <input className="form-control" type="text" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)} placeholder="Slot" />
         </div>
         <div className="form-group">
-          <input className="form-control" type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} placeholder="Patient ID" />
+          <input className="form-control" type="text" value={patientId} onChange={(e) => setPatientId(e.target.value)} placeholder="Patient Name" />
         </div>
         <div className="form-group">
           <input className="form-control" type="text" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} placeholder="email id" />
         </div>
+        <button onClick={handlePaymentClick}>Payment</button>
+        <br/>
         <button type="submit" className="btn btn-primary">Book Appointment</button>
       </form>
+
       {message && <p className="message">{message}</p>}
-      {appointmentId && <Notification id={appointmentId} />} {/* Render Notification component only when appointmentId is available */}
+      {<Notification id={appointmentId} />} {/* Render Notification component only when appointmentId is available */}
 
 
     </div>
